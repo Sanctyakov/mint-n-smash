@@ -5,20 +5,20 @@ using UnityEngine.SceneManagement;
 public class GameController : MonoBehaviour
 {
     public GameObject mainMenu, HUD, debriefing, youWin, youLose;
-    public HammerCursor hammerCursor;
-    public GameObject[] smashables;
+    public CustomCursor customCursor;
+    public GameObject[] hittables; // Spawn rate of each set by amount in array. Set in editor.
     public ParticleSystem[] sparks;
     public Animator clickBlockerAnimator;
     public Transform spawnPoint, worldSpace, popUpCanvas;
     public TMP_Text userName, timer, score, greenPopUp, redPopUp, orangePopUp;
     public int targetPoints = 200, pointsEarned;
 
-    private Smashable fixedSmashable;
+    private GameObject fixedHittable;
     private int fixedSpawnsCounter, maxFixedSpawns;
     private bool fixedSpawns;
     private float time = 120.0f, minSpawnRate, maxSpawnRate, timeCounter, spawnTimeCounter = 0.0f, rewardMultiplier = 1.0f, timeMultiplier = 1.0f;
     
-    //set custom range for random position
+    //Set custom range for random position.
     public float spawnMinX;
     public float spawnMaxX;
 
@@ -47,14 +47,14 @@ public class GameController : MonoBehaviour
                 mainMenu.SetActive(true);
                 HUD.SetActive(false);
                 debriefing.SetActive(false);
-                hammerCursor.gameObject.SetActive(false);
+                customCursor.gameObject.SetActive(false);
                 Cursor.visible = true;
                 break;
             case GameStates.Game:
                 mainMenu.SetActive(false);
                 HUD.SetActive(true);
                 debriefing.SetActive(false);
-                hammerCursor.gameObject.SetActive(true);
+                customCursor.gameObject.SetActive(true);
                 Cursor.visible = false;
                 break;
             case GameStates.Win:
@@ -63,7 +63,7 @@ public class GameController : MonoBehaviour
                 debriefing.SetActive(true);
                 youWin.SetActive(true);
                 youLose.SetActive(false);
-                hammerCursor.gameObject.SetActive(false);
+                customCursor.gameObject.SetActive(false);
                 Cursor.visible = true;
                 break;
             case GameStates.Lose:
@@ -72,7 +72,7 @@ public class GameController : MonoBehaviour
                 debriefing.SetActive(true);
                 youWin.SetActive(false);
                 youLose.SetActive(true);
-                hammerCursor.gameObject.SetActive(false);
+                customCursor.gameObject.SetActive(false);
                 Cursor.visible = true;
                 break;
         }
@@ -108,7 +108,7 @@ public class GameController : MonoBehaviour
 
         if (timeCounter >= spawnTimeCounter)
         {
-            SpawnSmashableAtRandomPosition();
+            SpawnHittableAtRandomPosition();
 
             spawnTimeCounter += Random.Range(minSpawnRate, maxSpawnRate);
         }
@@ -133,7 +133,7 @@ public class GameController : MonoBehaviour
 
         if (remainingSeconds <= 10)
         {
-            //timeAlert.Begin();
+            //timeAlert.Begin(); // Pending implementation.
         }
 
         if (time >= 60)
@@ -153,7 +153,7 @@ public class GameController : MonoBehaviour
         timer.text = displayTime + suffix;
     }
 
-    void SpawnSmashableAtRandomPosition()
+    void SpawnHittableAtRandomPosition()
     {
         float x = Random.Range(spawnMinX, spawnMaxX);
 
@@ -161,7 +161,7 @@ public class GameController : MonoBehaviour
 
         if (fixedSpawns)
         {
-            Instantiate(fixedSmashable, v3, spawnPoint.rotation);
+            Instantiate(fixedHittable, v3, spawnPoint.rotation);
 
             fixedSpawnsCounter++;
 
@@ -173,58 +173,47 @@ public class GameController : MonoBehaviour
         }
         else
         {
-            SpawnRandomSmashable(v3);
+            SpawnRandomHittable(v3);
         }
     }
 
-    void SpawnRandomSmashable(Vector3 v3)
+    void SpawnRandomHittable(Vector3 v3)
     {
-        Instantiate(smashables[Random.Range(0, smashables.Length)], v3, spawnPoint.rotation, worldSpace);
+        Instantiate(hittables[Random.Range(0, hittables.Length)], v3, spawnPoint.rotation, worldSpace);
     }
 
-    void SpawnRandomSparks(Transform smashableTransform)
+    public void SpawnRandomSparks(Transform hittableTransform)
     {
-        Instantiate(sparks[Random.Range(0, sparks.Length)], smashableTransform.position, smashableTransform.rotation, worldSpace);
+        Instantiate(sparks[Random.Range(0, sparks.Length)], hittableTransform.position, hittableTransform.rotation, worldSpace);
     }
 
-    void SpawnGreenPopUp(string greenPopUpText, Transform smashableTransform)
+    void SpawnPopUp(TMP_Text popUpToInstantiate, string popUpText, Transform hittableTransform)
     {
-        Camera cam = Camera.main;
-
-        Vector3 pos = cam.WorldToScreenPoint(smashableTransform.position);
-        TMP_Text g = Instantiate(greenPopUp, pos, Quaternion.identity, popUpCanvas);
-        g.text = greenPopUpText;
+        Vector3 pos = Camera.main.WorldToScreenPoint(hittableTransform.position);
+        TMP_Text t = Instantiate(popUpToInstantiate, pos, Quaternion.identity, popUpCanvas);
+        t.text = popUpText;
     }
 
-    void SpawnRedPopUp(string redPopUpText, Transform smashableTransform)
+    public void UpdatePoints(int points, Transform hittableTransform)
     {
-        Camera cam = Camera.main;
+        if (gameState != GameStates.Game || points == 0) return; // Don't keep updating points after you've won, or if there are no points to be updated.
 
-        Vector3 pos = cam.WorldToScreenPoint(smashableTransform.position);
-        TMP_Text r = Instantiate(redPopUp, pos, Quaternion.identity, popUpCanvas);
-        r.text = redPopUpText;
-    }
+        int pointsTotal = (int)(points * rewardMultiplier);
 
-    void SpawnOrangePopUp(string orangePopUpText, Transform smashableTransform)
-    {
-        Camera cam = Camera.main;
+        pointsEarned += pointsTotal;
 
-        Vector3 pos = cam.WorldToScreenPoint(smashableTransform.position);
-        TMP_Text o = Instantiate(orangePopUp, pos, Quaternion.identity, popUpCanvas);
-        o.text = orangePopUpText;
-    }
-
-    public void AwardPoints(int pointsAwarded, Transform smashableTransform)
-    {
-        int pointsToAdd = (int) (pointsAwarded * rewardMultiplier);
-
-        pointsEarned += pointsToAdd;
+        if (pointsEarned <= 0) pointsEarned = 0; // Can't have negative points.
 
         score.text = pointsEarned.ToString();
 
-        SpawnGreenPopUp("+" + pointsToAdd, smashableTransform);
-
-        SpawnRandomSparks(smashableTransform);
+        if (points < 0)
+        {
+            SpawnPopUp(redPopUp, pointsTotal.ToString(), hittableTransform); // Negative ints already have a "-".
+        }
+        else
+        {
+            SpawnPopUp(greenPopUp, "+" + pointsTotal, hittableTransform);
+        }
 
         if (pointsEarned >= targetPoints)
         {
@@ -232,86 +221,59 @@ public class GameController : MonoBehaviour
         }
     }
 
-    public void LosePoints(int pointsLost, Transform smashableTransform)
+    public void UpdateTimer(float newTime, float extraTime, float extraTimeRate, Transform hittableTransform)
     {
-        if (gameState != GameStates.Game) return; // Don't keep subtracting points after you've won.
+        newTime += pointsEarned * extraTime / extraTimeRate;
 
-        pointsEarned -= pointsLost;
+        time += newTime;
 
-        if (pointsEarned < 0) pointsEarned = 0;
-
-        score.text = pointsEarned.ToString();
-
-        SpawnRedPopUp("-" + pointsLost, smashableTransform);
-
-        SpawnRandomSparks(smashableTransform);
+        SpawnPopUp(greenPopUp, "+" + newTime + "s", hittableTransform);
     }
 
-    public void AwardTime(float timeAwarded, float extraTime, float extraTimeRate, Transform smashableTransform)
+    public void ScrambleHittables(Transform hittableTransform)
     {
-        timeAwarded += pointsEarned * extraTime / extraTimeRate;
+        GameObject[] hittablesOnScreen;
 
-        time += timeAwarded;
+        hittablesOnScreen = GameObject.FindGameObjectsWithTag("Hittable");
 
-        SpawnGreenPopUp("+" + timeAwarded + "s", smashableTransform);
-
-        SpawnRandomSparks(smashableTransform);
-    }
-
-    public void ScrambleSmashables(Transform smashableTransform)
-    {
-        GameObject[] smashablesOnScreen;
-
-        smashablesOnScreen = GameObject.FindGameObjectsWithTag("Smashable");
-
-        foreach (GameObject s in smashablesOnScreen)
+        foreach (GameObject h in hittablesOnScreen)
         {
-            SpawnRandomSmashable(s.transform.position);
+            SpawnRandomHittable(h.transform.position);
 
-            Destroy(s);
+            Destroy(h);
         }
 
-        SpawnOrangePopUp("SCRAMBLE!", smashableTransform);
-
-        SpawnRandomSparks(smashableTransform);
+        SpawnPopUp(orangePopUp, "SCRAMBLE!", hittableTransform);
     }
 
-    public void MultiplyMouseSpeed(float speedMultiplier, float speedBoostDuration, Transform smashableTransform)
+    public void MultiplyMouseSpeed(float speedMultiplier, float speedBoostDuration, Transform hittableTransform)
     {
-        SpawnGreenPopUp("Hammer speed x" + speedMultiplier+ "!", smashableTransform);
+        SpawnPopUp(greenPopUp, "Hammer speed x" + speedMultiplier+ "!", hittableTransform);
 
-        SpawnRandomSparks(smashableTransform);
-
-        hammerCursor.ChangeSpeed(speedMultiplier, speedBoostDuration);
+        customCursor.ChangeSpeed(speedMultiplier, speedBoostDuration);
     }
 
-    public void AccelerateGame(float timeMultiplier, float rewardMultiplier, Transform smashableTransform)
+    public void AccelerateGame(float timeMultiplier, float rewardMultiplier, Transform hittableTransform)
     {
         this.rewardMultiplier *= rewardMultiplier;
         this.timeMultiplier *= timeMultiplier;
 
-        SpawnOrangePopUp("Time speed x" + this.timeMultiplier + "!\n Rewards x" + this.rewardMultiplier + "!", smashableTransform);
-
-        SpawnRandomSparks(smashableTransform);
+        SpawnPopUp(orangePopUp, "Time speed x" + this.timeMultiplier + "!\n Rewards x" + this.rewardMultiplier + "!", hittableTransform);
     }
 
-    public void BlockClicks(/*float timeBlocked,*/ Transform smashableTransform) // Click block time set by animation.
+    public void BlockClicks(/*float timeBlocked,*/ Transform hittableTransform) // Click block time set by animation.
     {
-        SpawnRedPopUp("SMASHING BLOCKED!", smashableTransform);
-
-        SpawnRandomSparks(smashableTransform);
+        SpawnPopUp(redPopUp, "HITS BLOCKED!", hittableTransform);
 
         clickBlockerAnimator.SetTrigger("Animate");
     }
 
-    public void FixNextSpawns(int spawnsAffected, Smashable fixedSmashable, Transform smashableTransform)
+    public void FixNextSpawns(int spawnsAffected, GameObject fixedHittable, Transform hittableTransform)
     {
-        SpawnGreenPopUp("Mint 'em coins!", smashableTransform);
-
-        SpawnRandomSparks(smashableTransform);
+        SpawnPopUp(greenPopUp, "Mint 'em coins!", hittableTransform);
 
         fixedSpawns = true;
-        maxFixedSpawns = spawnsAffected;
-        this.fixedSmashable = fixedSmashable;
+        maxFixedSpawns += spawnsAffected; // += added. Get two of these in a row, mint double the coins.
+        this.fixedHittable = fixedHittable;
     }
 }

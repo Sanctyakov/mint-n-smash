@@ -4,9 +4,9 @@ public class DestroyOnTriggerExit : MonoBehaviour
 {
     private void OnTriggerExit(Collider other)
     {
-        LosePointsOnMiss lpom = other.GetComponent<LosePointsOnMiss>();
+        HittableBehaviour hb = other.GetComponent<HittableBehaviour>();
 
-        if (lpom != null) lpom.LosePoints();
+        if (hb != null) hb.OnMiss();
 
         Destroy(other.gameObject);
     }
